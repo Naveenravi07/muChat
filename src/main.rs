@@ -8,16 +8,18 @@ use tokio::{
 #[tokio::main]
 
 async fn main() -> Result<()> {
+    tracing_subscriber::fmt::init();
+
     let addr = "0.0.0.0:8080";
     let listener = TcpListener::bind(addr).await?;
     let (tx, _rx): (Sender<String>, Receiver<String>) = tokio::sync::broadcast::channel(30);
 
     loop {
         let tx2 = tx.clone();
-        let mut rx2 = tx2.subscribe();
+        let mut rx2 = tx.subscribe();
 
         let (mut stream, _sock_addr) = listener.accept().await?;
-        println!("INFO: new client connected successfully");
+        tracing::info!("INFO: new client connected successfully");
 
         tokio::spawn(async move {
             let (s_reader, mut s_writer) = stream.split();
@@ -26,20 +28,15 @@ async fn main() -> Result<()> {
                 let mut client_inp = String::new();
                 client_inp.clear();
                 stream_buff_reader.read_line(&mut client_inp).await.unwrap();
-                s_writer.write(client_inp.as_bytes()).await.unwrap();
-                tx2.send(client_inp).unwrap();
-            }
-        });
+                tx2.send(client_inp.clone()).unwrap();
 
-        tokio::spawn(async move {
-            match rx2.recv().await {
-                Ok(message) => {
-                    println!("Receieved data {} over threads", message);
+                tracing::info!("Trying  to Receieve");
+                while let Ok(message) = rx2.try_recv() {
+                    tracing::info!("Receieved {}", message);
+                    s_writer.write_all(message.as_bytes()).await.unwrap();
                 }
-                Err(err) => {
-                    println!("ERR occured");
-                }
-            };
+                tracing::info!("Tried to Receieve");
+            }
         });
     }
 }
