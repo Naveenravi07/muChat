@@ -1,6 +1,5 @@
-use std::net::SocketAddr;
-
 use anyhow::Result;
+use std::net::SocketAddr;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::TcpListener,
@@ -28,21 +27,24 @@ async fn main() -> Result<()> {
         tokio::spawn(async move {
             let (s_reader, mut s_writer) = stream.split();
             let mut stream_buff_reader = BufReader::new(s_reader);
+
             loop {
                 let mut client_inp = String::new();
-                client_inp.clear();
-                stream_buff_reader.read_line(&mut client_inp).await.unwrap();
-                tx2.send((client_inp.clone(), sock_addr)).unwrap();
+                tokio::select! {
+                    _ = stream_buff_reader.read_line(&mut client_inp)=>{
+                        tx2.send((client_inp.clone(), sock_addr)).unwrap();
+                        client_inp.clear();
+                    },
 
-                tracing::info!("Trying  to Receieve");
-                while let Ok((message, message_addr)) = rx2.try_recv() {
-                    if message_addr == sock_addr {
-                        continue;
-                    }
-                    tracing::info!("Receieved {}", message);
-                    s_writer.write_all(message.as_bytes()).await.unwrap();
+                    Ok((message, message_addr)) = rx2.recv() =>  {
+                             if message_addr == sock_addr {
+                                 continue;
+                             }
+                             tracing::info!("Receieved {}", message);
+                             s_writer.write_all(message.as_bytes()).await.unwrap();
+                         }
+
                 }
-                tracing::info!("Tried to Receieve");
             }
         });
     }
