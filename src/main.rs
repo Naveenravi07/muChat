@@ -14,7 +14,7 @@ async fn main() -> Result<()> {
     let addr = "0.0.0.0:8080";
     let listener = TcpListener::bind(addr).await?;
     let (tx, _rx): (Sender<(String, SocketAddr)>, Receiver<(String, SocketAddr)>) =
-        tokio::sync::broadcast::channel(30);
+                    tokio::sync::broadcast::channel(30);
 
     loop {
         let tx2 = tx.clone();
@@ -36,13 +36,13 @@ async fn main() -> Result<()> {
                     },
 
                     Ok((message, message_addr)) = rx2.recv() =>  {
-                             if message_addr == sock_addr {
-                                 continue;
-                             }
-                             tracing::info!("Receieved {}", message);
-                             s_writer.write_all(message.as_bytes()).await.unwrap();
-                         }
-
+                        tracing::info!("Receieved {}", message);
+                        if message_addr == sock_addr {
+                            continue;
+                        }
+                        let fm_str = format!(" {} {}",sock_addr.port(),message);
+                        s_writer.write_all(fm_str.as_bytes()).await.unwrap();
+                    }
                 }
             }
         });
