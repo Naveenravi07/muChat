@@ -3,7 +3,6 @@ use std::net::SocketAddr;
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::TcpListener,
-    select,
     sync::broadcast::{Receiver, Sender},
 };
 
