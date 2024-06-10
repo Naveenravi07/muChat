@@ -1,8 +1,9 @@
+extern crate colored;
 use anyhow::Result;
+use colored::*;
 use std::{
     collections::HashMap,
     net::SocketAddr,
-    str::FromStr,
     sync::{Arc, RwLock},
 };
 use tokio::{
@@ -37,9 +38,8 @@ async fn main() -> Result<()> {
             let mut stream_buff_reader = BufReader::new(s_reader);
             let mut client_inp = String::new();
 
-            println!("Enter the username \n");
             s_writer
-                .write("Please Enter your username".as_bytes())
+                .write("\n Please Enter your username \t".yellow().as_bytes())
                 .await
                 .unwrap();
 
@@ -69,7 +69,7 @@ async fn main() -> Result<()> {
                         if message_addr == sock_addr {
                             continue;
                         }
-                        let fm_str = format!(" {} : {}",client_name,message);
+                        let fm_str = format!(" {} : {}",client_name.blue(),message.bright_green());
                         s_writer.write_all(fm_str.as_bytes()).await.unwrap();
                     }
                 }
