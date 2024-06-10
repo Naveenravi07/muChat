@@ -101,6 +101,7 @@ async fn main() -> Result<()> {
                         }
                         let fm_str = format!(" {} : {}",client_name.blue(),message.bright_green());
                         s_writer.write_all(fm_str.as_bytes()).await.unwrap();
+                        s_writer.flush().await.unwrap();
                     }
                 }
             }
