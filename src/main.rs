@@ -11,10 +11,12 @@ use tokio::{
     net::TcpListener,
     select,
     sync::broadcast::{Receiver, Sender},
+    task::JoinHandle,
 };
 
-#[tokio::main]
+const MAX_CLIENT_NAME_LENGTH: usize = 10;
 
+#[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
@@ -24,6 +26,8 @@ async fn main() -> Result<()> {
         tokio::sync::broadcast::channel(30);
     let client_data: Arc<RwLock<HashMap<SocketAddr, String>>> =
         Arc::new(RwLock::new(HashMap::new()));
+    let client_handlers: Arc<RwLock<HashMap<SocketAddr, JoinHandle<_>>>> =
+        Arc::new(RwLock::new(HashMap::new()));
 
     loop {
         let tx2 = tx.clone();
@@ -31,9 +35,10 @@ async fn main() -> Result<()> {
 
         let (mut stream, sock_addr) = listener.accept().await?;
         tracing::info!("INFO: new client connected successfully");
-
         let client_data_clo = Arc::clone(&client_data);
-        tokio::spawn(async move {
+        // let client_handlers_clo = Arc::clone(&client_handlers);
+
+        let task = tokio::spawn(async move {
             let (s_reader, mut s_writer) = stream.split();
             let mut stream_buff_reader = BufReader::new(s_reader);
             let mut client_inp = String::new();
@@ -42,17 +47,42 @@ async fn main() -> Result<()> {
                 .write("\n Please Enter your username \t".yellow().as_bytes())
                 .await
                 .unwrap();
-
             stream_buff_reader.read_line(&mut client_inp).await.unwrap();
-            {
-                client_data_clo
-                    .write()
-                    .unwrap()
-                    .insert(sock_addr, client_inp.trim().to_string());
-            }
-            client_inp.clear();
-            println!("{:?}", client_data_clo);
 
+
+            // Validations
+            if client_inp.len() > MAX_CLIENT_NAME_LENGTH {
+                s_writer
+                    .write("NICK NAME TOO LONG ! Exiting.. ".bright_red().as_bytes())
+                    .await
+                    .unwrap();
+                return;
+                //if let Some(task) = client_handlers_clo.read().unwrap().get(&sock_addr.clone()) {
+                //    task.abort();
+                //}
+            }
+
+            let nickname_exists = {
+                let client_data_read = client_data_clo.read().unwrap();
+                client_data_read
+                    .values()
+                    .any(|name| name == client_inp.trim())
+            };
+
+            if nickname_exists {
+                s_writer
+                    .write("Nickname already taken".red().as_bytes())
+                    .await
+                    .unwrap();
+                return;
+            }
+
+            client_data_clo
+                .write()
+                .unwrap()
+                .insert(sock_addr, client_inp.trim().to_string());
+
+            client_inp.clear();
             loop {
                 select! {
                     _ = stream_buff_reader.read_line(&mut client_inp)=>{
@@ -75,5 +105,6 @@ async fn main() -> Result<()> {
                 }
             }
         });
+        client_handlers.write().unwrap().insert(sock_addr, task);
     }
 }
