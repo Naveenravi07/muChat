@@ -1,5 +1,6 @@
 extern crate colored;
 use anyhow::Result;
+use censor::*;
 use colored::*;
 use std::{
     collections::HashMap,
@@ -39,6 +40,7 @@ async fn main() -> Result<()> {
         // let client_handlers_clo = Arc::clone(&client_handlers);
 
         let task = tokio::spawn(async move {
+            let censor = Censor::Standard;
             let (s_reader, mut s_writer) = stream.split();
             let mut stream_buff_reader = BufReader::new(s_reader);
             let mut client_inp = String::new();
@@ -88,6 +90,7 @@ async fn main() -> Result<()> {
             loop {
                 select! {
                     _ = stream_buff_reader.read_line(&mut client_inp)=>{
+                        client_inp = censor.censor(&client_inp);
                         tx2.send((client_inp.clone(), sock_addr)).unwrap();
                         client_inp.clear();
                     },
